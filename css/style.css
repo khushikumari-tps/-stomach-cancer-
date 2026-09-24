@@ -248,7 +248,7 @@ ul{margin:0;padding:0;list-style:none}
 .about-band .wrap{max-width:1700px}
 .about-band__grid{display:grid;grid-template-columns:minmax(0,1fr) 546px;gap:46px;align-items:start}
 .about h2{font-family:var(--font-head);font-size:clamp(1.6rem,2.4vw,2.1rem);font-weight:400;color:var(--ink);margin:0 0 24px;letter-spacing:-.01em}
-.about h2 em{font-style:italic;font-weight:800}
+.about h2 em{font-style:normal;font-weight:800}
 .about p{color:var(--body);font-size:1rem;line-height:1.72;max-width:74ch}
 .about a.inline{color:var(--blue-600);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 .about__more{max-height:0;overflow:hidden;transition:max-height .4s ease}
@@ -764,7 +764,7 @@ html.modal-open{overflow:hidden}
   font-family:var(--font-head);font-weight:400;font-size:clamp(1.6rem,2.6vw,2.15rem);
   color:#6B5758;margin:0;letter-spacing:-.01em;
 }
-.tl-head h2 em{font-style:italic;font-weight:800;color:var(--ink)}
+.tl-head h2 em{font-style:normal;font-weight:800;color:var(--ink)}
 .tl-nav{display:flex;gap:10px;flex:none}
 .tl-nav button{
   width:44px;height:44px;border-radius:50%;border:1px solid #E0CDCB;background:#fff;cursor:pointer;
@@ -1557,3 +1557,33 @@ body{top:0 !important}
 .field__radios input[type="radio"]:checked{border-color:var(--blue-600);box-shadow:inset 0 0 0 3.5px var(--blue-600)}
 .field__radios input[type="radio"]:focus{outline:none;box-shadow:inset 0 0 0 3.5px var(--blue-600),0 0 0 4px rgba(194,74,68,.14)}
 .field__radios input[type="radio"]:focus-visible{outline:3px solid var(--blue-500);outline-offset:2px}
+
+/* ---------- no italics anywhere ---------- */
+em,i{font-style:normal}
+
+/* ---------- stacked Advitya logo (image only) ---------- */
+.brandmark--stacked{padding:0;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;border-radius:0}
+.brandmark--stacked:hover{box-shadow:none}
+.brandmark--stacked img{height:clamp(66px,7vw,86px)}
+.brandmark--stacked.is-compact{padding:0}
+.brandmark--stacked.is-compact img{height:58px}
+@media (max-width:760px){
+  .brandmark--stacked img{height:60px}
+}
+
+/* ---------- appointment modal (full form, same fields as the main site) ---------- */
+.modal__card--form{max-width:620px;max-height:calc(100vh - 44px);max-height:calc(100dvh - 44px);overflow-y:auto;overscroll-behavior:contain}
+.modal__card--form .modal__sub{margin-bottom:20px;padding-right:28px}
+.modal__card--form .form-grid{gap:14px}
+.modal__card--form .modal__go{margin-top:6px}
+.modal__card--form .modal__error{margin:0 0 12px}
+.modal__card--form .modal__error a{color:inherit;font-weight:700;text-decoration:underline}
+.modal__card--form .form-note{text-align:center;margin-top:14px}
+.modal__card--form .form-note a{color:var(--blue-600);font-weight:600}
+.field__label{font-family:var(--font-head);font-size:.84rem;font-weight:700;color:var(--navy-800)}
+.field__label span{color:var(--blue-600)}
+.field select[aria-invalid="true"]{border-color:#C24A44;background:#fff}
+@media (max-width:600px){
+  .modal__card--form .form-grid{grid-template-columns:1fr}
+  .modal__card--form{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px)}
+}

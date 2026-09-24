@@ -500,26 +500,81 @@
     tlSync();
   }
 
-  /* ---------- quick-start modal ---------- */
+  /* ---------- appointment modal ----------
+     Same form as the main Advitya site's pop-up. Every "Book Appointment"
+     opens it, pre-filled with the centre, date and time already picked in
+     the widget; "Request Appointment" posts the lead to the CRM through
+     js/crm-lead.js (keyed in js/crm-config.js) and moves to thank-you.
+     If the CRM is off or unreachable the request goes out on WhatsApp
+     instead, so a lead is never dropped. */
+  var SERVICE = 'Stomach Cancer Surgery';
   var modal = $('#quick-modal');
   var quickForm = $('#quick-form');
-  var quickPhone = $('#quick-phone');
   var quickError = $('#quick-error');
   var lastFocus = null;
+
+  var qf = quickForm ? {
+    name: $('#qf-name', quickForm),
+    phone: $('#qf-phone', quickForm),
+    email: $('#qf-email', quickForm),
+    date: $('#qf-date', quickForm),
+    time: $('#qf-time', quickForm),
+    message: $('#qf-message', quickForm),
+    submit: $('button[type="submit"]', quickForm)
+  } : null;
+
+  if (qf && qf.time) {
+    TIMES.forEach(function (t) {
+      var o = document.createElement('option');
+      o.value = t;
+      o.textContent = label12(t);
+      qf.time.appendChild(o);
+    });
+  }
 
   function normalisePhone(value) {
     return String(value || '').replace(/[^0-9]/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
   }
 
+  function centreValue() {
+    return (quickForm && ($('input[name="centre"]:checked', quickForm) || {}).value) || picked.location;
+  }
+
+  function setQuickStatus(msg, ok) {
+    if (!quickError) return;
+    quickError.innerHTML = msg || '';
+    quickError.classList.toggle('is-visible', !!msg);
+    quickError.classList.toggle('is-ok', !!ok);
+  }
+
+  function showFieldError(field, msg) {
+    var box = field.closest('.field');
+    var err = box ? $('.field__error', box) : null;
+    field.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    if (err) { err.textContent = msg || ''; err.classList.toggle('is-visible', !!msg); }
+  }
+
+  // carry the widget's choices into the form each time it opens
+  function prefillQuick() {
+    if (!qf) return;
+    var today = isoOf(new Date());
+    qf.date.min = today;
+    if (picked.date && picked.date >= today) qf.date.value = picked.date;
+    if (picked.time) qf.time.value = picked.time;
+    var radio = $('input[name="centre"][value="' + picked.location + '"]', quickForm);
+    if (radio) radio.checked = true;
+  }
+
   function openModal(trigger) {
     if (!modal) return;
     lastFocus = trigger || document.activeElement;
+    prefillQuick();
     modal.hidden = false;
     modal.classList.add('is-open');
     document.body.classList.add('modal-open');
     document.documentElement.classList.add('modal-open');
-    if (quickError) { quickError.textContent = ''; quickError.classList.remove('is-visible'); }
-    setTimeout(function () { if (quickPhone) quickPhone.focus(); }, 60);
+    setQuickStatus('');
+    setTimeout(function () { if (qf && qf.name) qf.name.focus(); }, 60);
   }
 
   function closeModal() {
@@ -531,16 +586,38 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
-  function sendRequest(phone) {
+  function whatsappUrl(lead) {
     var lines = [
-      'Stomach cancer surgery consultation request \u2014 Advitya Healthcares',
-      'Mobile: +91 ' + phone,
-      'Preferred location: ' + picked.location
+      SERVICE + ' consultation request — Advitya Healthcares',
+      'Name: ' + lead.name,
+      'Mobile: +91 ' + lead.phone,
+      'Email: ' + lead.email,
+      'Preferred centre: ' + lead.centre,
+      'Preferred date: ' + lead.date
     ];
-    if (picked.date) lines.push('Preferred date: ' + picked.date);
-    if (picked.time) lines.push('Preferred time: ' + label12(picked.time));
-    window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(lines.join('\n')),
-      '_blank', 'noopener');
+    if (lead.time) lines.push('Preferred time: ' + label12(lead.time));
+    if (lead.message) lines.push('Message: ' + lead.message);
+    return 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(lines.join('\n'));
+  }
+
+  function sendToCRM(lead) {
+    if (!window.AdvCRM || !window.AdvCRM.enabled()) return Promise.resolve(false);
+    return window.AdvCRM.post({
+      name: lead.name,
+      phone: lead.phone,
+      email: lead.email,
+      city: lead.centre,
+      product: SERVICE,
+      title: 'Appointment request',
+      lines: {
+        'Service': SERVICE,
+        'Centre': lead.centre,
+        'Preferred date': lead.date,
+        'Preferred time': lead.time ? label12(lead.time) : 'No preference',
+        'Message': lead.message,
+        'Page': window.location.href
+      }
+    });
   }
 
   $$('[data-book]').forEach(function (el) {
@@ -567,7 +644,7 @@
       if (!modal.classList.contains('is-open')) return;
       if (e.key === 'Escape') { closeModal(); return; }
       if (e.key === 'Tab') {
-        var focusable = $$('button, input, a[href]', modal).filter(function (n) { return !n.disabled; });
+        var focusable = $$('button, input, select, textarea, a[href]', modal).filter(function (n) { return !n.disabled; });
         if (!focusable.length) return;
         var first = focusable[0], last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -576,24 +653,55 @@
     });
   }
 
-  if (quickForm) {
+  if (quickForm && qf) {
+    $$('input, textarea', quickForm).forEach(function (f) {
+      f.addEventListener('input', function () { showFieldError(f, ''); });
+    });
+
     quickForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      var digits = normalisePhone(quickPhone.value);
-      if (!/^[6-9][0-9]{9}$/.test(digits)) {
-        quickError.textContent = 'Please enter a valid 10-digit Indian mobile number.';
-        quickError.classList.add('is-visible');
-        quickPhone.focus();
-        return;
-      }
-      quickError.textContent = 'Opening WhatsApp with your request \u2026';
-      quickError.classList.add('is-visible', 'is-ok');
-      sendRequest(digits);
-      setTimeout(function () {
-        quickError.classList.remove('is-ok');
-        quickForm.reset();
-        closeModal();
-      }, 1400);
+      if (qf.submit.disabled) return;
+
+      var firstBad = null;
+      var fail = function (field, msg) { showFieldError(field, msg); if (!firstBad) firstBad = field; };
+      var name = qf.name.value.trim();
+      var phone = normalisePhone(qf.phone.value);
+      var email = qf.email.value.trim();
+      var date = qf.date.value;
+
+      if (name.length < 2) fail(qf.name, 'Please enter your full name.');
+      if (!/^[6-9][0-9]{9}$/.test(phone)) fail(qf.phone, 'Please enter a valid 10-digit Indian mobile number.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) fail(qf.email, 'Please enter a valid email address.');
+      if (!date) fail(qf.date, 'Please choose a preferred date.');
+      else if (date < isoOf(new Date())) fail(qf.date, 'Please choose today or a future date.');
+      if (firstBad) { firstBad.focus(); return; }
+
+      var lead = {
+        name: name, phone: phone, email: email,
+        centre: centreValue(), date: date, time: qf.time.value,
+        message: qf.message.value.trim()
+      };
+
+      qf.submit.disabled = true;
+      qf.submit.textContent = 'Sending your request…';
+      setQuickStatus('');
+
+      sendToCRM(lead).then(function (ok) {
+        if (ok) {
+          try {
+            sessionStorage.setItem('adv-appt', JSON.stringify({
+              name: lead.name, phone: lead.phone, email: lead.email,
+              date: lead.date, location: lead.centre
+            }));
+          } catch (err) {}
+          window.location.assign('thank-you.html');
+          return;
+        }
+        qf.submit.disabled = false;
+        qf.submit.textContent = 'Request Appointment';
+        setQuickStatus('We could not send your request just now. Please <a href="' + whatsappUrl(lead) +
+          '" target="_blank" rel="noopener">send it on WhatsApp</a> or call <a href="tel:+919211221551">+91 9211221551</a>.');
+      });
     });
   }
 
